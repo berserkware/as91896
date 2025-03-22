@@ -18,6 +18,7 @@ use rusqlite::Connection;
 use crate::order::{Order, OrderBuilder};
 use crate::order::table::{OrderColumn, OrderColumnKind};
 use crate::helpers::{field_error, required_input_label};
+use crate::database::init_db;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TabId {
@@ -66,7 +67,7 @@ pub struct App {
 
 impl App {
     pub fn new() -> (Self, Task<Message>) {
-	let db_connection = Self::init_db();
+	let db_connection = init_db();
 	let orders = Order::get_all(&db_connection);
 	
 	let app = Self {
@@ -97,14 +98,6 @@ impl App {
         };
 	
         (app,Task::none())
-    }
-
-    fn init_db() -> Connection {
-	let connection = Connection::open("./orders.db").unwrap();
-
-	Order::init_table(&connection);
-
-	connection
     }
 
     pub fn title(&self) -> String {

@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4.39"
+dirs = "6.0.0"
 iced = { version = "0.13.1", features = ["lazy"] }
 iced_aw = { version = "0.12.2", features = ["tab_bar", "tabs"] }
 iced_table = "0.13.0"
