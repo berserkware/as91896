@@ -1,5 +1,5 @@
 use iced::{Element, Color};
-use iced::widget::{row, Column, Row, Text, column};
+use iced::widget::{row, Text, column};
 use crate::app::Message;
 
 pub fn field_error(error: Option<String>) -> Element<'static, Message> {

@@ -9,9 +9,8 @@ use iced::widget::{
     row,
     container,
 };
-use iced::{Element, Length, Task, Theme};
+use iced::{Alignment, Element, Length, Task, Theme};
 
-use iced_aw::widget::{Tabs, TabLabel};
 use iced_table::table;
 use rusqlite::Connection;
 
@@ -23,6 +22,7 @@ use crate::order_table::{OrderColumn, OrderColumnKind};
 pub enum TabId {
     Orders,
     AddOrder,
+    RaffleWinner,
 }
 
 #[derive(Clone, Debug)]
@@ -76,6 +76,7 @@ impl App {
 		OrderColumn::new(OrderColumnKind::HiredOn),
 		OrderColumn::new(OrderColumnKind::ReturnOn),
 		OrderColumn::new(OrderColumnKind::BoxesNeeded),
+		OrderColumn::new(OrderColumnKind::RaffleNumber),
 		OrderColumn::new(OrderColumnKind::Delete),
 	    ]
         };
@@ -92,7 +93,7 @@ impl App {
     }
 
     pub fn title(&self) -> String {
-        return "as91869".into();
+        return "Store Manager Tool".into();
     }
 
     pub fn theme(&self) -> Theme {
@@ -171,77 +172,77 @@ impl App {
     }
 
     pub fn view(&self) -> Element<Message> {
-	Tabs::new(Message::TabSelected)
-	    .push(
-		TabId::Orders,
-		TabLabel::Text("Orders".to_string()),
-		column![
-		    container(
-			text("Orders").size(30)
-		    ).padding(10),
-		    responsive(|size| {
-			table(
-			    self.order_table_header.clone(),
-			    self.order_table_body.clone(),
-			    &self.order_table_columns,
-			    &self.orders,
-			    Message::SyncOrderTableHeader,
-			).on_column_resize(
-			    Message::OrderTableResizing,
-			    Message::OrderTableResized
-			).min_width(
-			    size.width
-			).into()
-		    })
-		],
-	    )
-	    .push(
-		TabId::AddOrder,
-		TabLabel::Text("Add Order".to_string()),
-		center(scrollable(column![
-		    text("Add Order").size(30),
-		    column![
-			required_input_label("Customer Name"),
-			text_input("", &self.order_builder.customer_name)
-			    .on_input(Message::CustomerNameChanged),
-			field_error(self.order_builder.get_visible_field_error("customer_name")),
-		    ],
-		    column![
-			required_input_label("Receipt Number"),
-			text_input("", &self.order_builder.receipt_number)
-			    .on_input(Message::ReceiptNumberChanged),
-			field_error(self.order_builder.get_visible_field_error("receipt_number")),
-		    ],
-		    column![
-			required_input_label("Item Hired"),
-			text_input("", &self.order_builder.item_hired)
-			    .on_input(Message::ItemHiredChanged),
-			field_error(self.order_builder.get_visible_field_error("item_hired")),
-		    ],
-		    column![
-			required_input_label("How Many"),
-			text_input("", &self.order_builder.how_many)
-			    .on_input(Message::HowManyChanged),
-			field_error(self.order_builder.get_visible_field_error("how_many")),
-		    ],
+	match self.active_tab {
+	    TabId::Orders => column![
+		container(
 		    row![
-			column![
-			    required_input_label("Hired On"),
-			    text_input("YYYY-mm-dd", &self.order_builder.hired_on)
-				.on_input(Message::HiredOnChanged),
-			    field_error(self.order_builder.get_visible_field_error("hired_on")),
-			],
-			column![
-			    required_input_label("Return On"),
-			    text_input("YYYY-mm-dd", &self.order_builder.return_on)
-				.on_input(Message::ReturnOnChanged),
-			    field_error(self.order_builder.get_visible_field_error("return_on")),
-			],
-		    ].spacing(20),
+			text("Orders").size(30),
+			button("Add Order").on_press(Message::TabSelected(TabId::AddOrder)),
+		    ].align_y(Alignment::Center).spacing(10)
+		).padding(10),
+		responsive(|size| {
+		    table(
+			self.order_table_header.clone(),
+			self.order_table_body.clone(),
+			&self.order_table_columns,
+			&self.orders,
+			Message::SyncOrderTableHeader,
+		    ).on_column_resize(
+			Message::OrderTableResizing,
+			Message::OrderTableResized
+		    ).min_width(
+			size.width
+		    ).into()
+		})
+	    ].into(),
+	    TabId::AddOrder => center(scrollable(column![
+		text("Add Order").size(30),
+		column![
+		    required_input_label("Customer Name"),
+		    text_input("", &self.order_builder.customer_name)
+			.on_input(Message::CustomerNameChanged),
+		    field_error(self.order_builder.get_visible_field_error("customer_name")),
+		],
+		column![
+		    required_input_label("Receipt Number"),
+		    text_input("", &self.order_builder.receipt_number)
+			.on_input(Message::ReceiptNumberChanged),
+		    field_error(self.order_builder.get_visible_field_error("receipt_number")),
+		],
+		column![
+		    required_input_label("Item Hired"),
+		    text_input("", &self.order_builder.item_hired)
+			.on_input(Message::ItemHiredChanged),
+		    field_error(self.order_builder.get_visible_field_error("item_hired")),
+		],
+		column![
+		    required_input_label("How Many"),
+		    text_input("", &self.order_builder.how_many)
+			.on_input(Message::HowManyChanged),
+		    field_error(self.order_builder.get_visible_field_error("how_many")),
+		],
+		row![
+		    column![
+			required_input_label("Hired On"),
+			text_input("YYYY-mm-dd", &self.order_builder.hired_on)
+			    .on_input(Message::HiredOnChanged),
+			field_error(self.order_builder.get_visible_field_error("hired_on")),
+		    ],
+		    column![
+			required_input_label("Return On"),
+			text_input("YYYY-mm-dd", &self.order_builder.return_on)
+			    .on_input(Message::ReturnOnChanged),
+			field_error(self.order_builder.get_visible_field_error("return_on")),
+		    ],
+		].spacing(20),
+		row![
 		    button("Add").on_press(Message::AddOrder),
-		].padding([10, 0]).width(Length::Fixed(500.0)).spacing(10)))
-	    )
-	    .set_active_tab(&self.active_tab)
-	    .into()
+		    button("Cancel").on_press(Message::TabSelected(TabId::Orders)),
+		].spacing(10),
+	    ].padding([10, 0]).width(Length::Fixed(500.0)).spacing(10))).into(),
+	    TabId::RaffleWinner => {
+		
+	    }
+	}
     }
 }

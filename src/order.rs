@@ -224,7 +224,7 @@ impl Order {
 	let mut rng = rand::rng();
 	let raffle_number = rng.random_range(0..=1000);
 	
-	let rows_affected = connection.execute(
+	connection.execute(
 	    "INSERT INTO CustomerOrder (
                 customer_name, 
                 receipt_number, 
@@ -244,7 +244,7 @@ impl Order {
 		boxes_needed.to_string(),
 		raffle_number.to_string(),
 	    ],
-	);
+	).unwrap();
 
 	Self::get_by_id(connection, connection.last_insert_rowid() as i32)
     }
