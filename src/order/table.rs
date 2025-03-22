@@ -20,6 +20,7 @@ impl OrderColumn {
 	    OrderColumnKind::HiredOn => 100.0,
 	    OrderColumnKind::ReturnOn => 100.0,
 	    OrderColumnKind::BoxesNeeded => 60.0,
+	    OrderColumnKind::RaffleNumber => 150.0,
 	    OrderColumnKind::Delete => 100.0,
 	};
 
@@ -39,6 +40,7 @@ pub enum OrderColumnKind {
     HiredOn,
     ReturnOn,
     BoxesNeeded,
+    RaffleNumber,
     Delete,
 }
 
@@ -54,6 +56,7 @@ impl<'a> table::Column<'a, Message, Theme, Renderer> for OrderColumn {
 	    OrderColumnKind::HiredOn => "Hired On",
 	    OrderColumnKind::ReturnOn => "Return On",
 	    OrderColumnKind::BoxesNeeded => "Boxes",
+	    OrderColumnKind::RaffleNumber => "Raffle Number",
 	    OrderColumnKind::Delete => "",
 	};
 
@@ -69,6 +72,7 @@ impl<'a> table::Column<'a, Message, Theme, Renderer> for OrderColumn {
 	    OrderColumnKind::HiredOn => text(row.hired_on.to_string()).into(),
 	    OrderColumnKind::ReturnOn => text(row.return_on.to_string()).into(),
 	    OrderColumnKind::BoxesNeeded => text(row.boxes_needed.to_string()).into(),
+	    OrderColumnKind::RaffleNumber => text(row.raffle_number.to_string()).into(),
 	    OrderColumnKind::Delete => button(text("Delete"))
 		.on_press(Message::DeleteOrder(row.id))
 		.into(),

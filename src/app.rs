@@ -16,13 +16,14 @@ use iced_table::table;
 use rusqlite::Connection;
 
 use crate::order::{Order, OrderBuilder};
+use crate::order::table::{OrderColumn, OrderColumnKind};
 use crate::helpers::{field_error, required_input_label};
-use crate::order_table::{OrderColumn, OrderColumnKind};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TabId {
     Orders,
     AddOrder,
+    Raffle,
 }
 
 #[derive(Clone, Debug)]
@@ -40,7 +41,10 @@ pub enum Message {
     SyncOrderTableHeader(scrollable::AbsoluteOffset),
     OrderTableResizing(usize, f32),
     OrderTableResized,
-    
+
+    SyncRaffleTableHeader(scrollable::AbsoluteOffset),
+    RaffleTableResizing(usize, f32),
+    RaffleTableResized,
 }
 
 pub struct App {
@@ -54,6 +58,10 @@ pub struct App {
     order_table_header: scrollable::Id,
     order_table_body: scrollable::Id,
     order_table_columns: Vec<OrderColumn>,
+
+    raffle_table_header: scrollable::Id,
+    raffle_table_body: scrollable::Id,
+    raffle_table_columns: Vec<OrderColumn>,
 }
 
 impl App {
@@ -66,6 +74,7 @@ impl App {
             active_tab: TabId::Orders,
 	    orders,
 	    order_builder: OrderBuilder::default(),
+	    
 	    order_table_header: scrollable::Id::unique(),
 	    order_table_body: scrollable::Id::unique(),
 	    order_table_columns: vec![
@@ -77,7 +86,14 @@ impl App {
 		OrderColumn::new(OrderColumnKind::ReturnOn),
 		OrderColumn::new(OrderColumnKind::BoxesNeeded),
 		OrderColumn::new(OrderColumnKind::Delete),
-	    ]
+	    ],
+
+	    raffle_table_header: scrollable::Id::unique(),
+	    raffle_table_body: scrollable::Id::unique(),
+	    raffle_table_columns: vec![
+		OrderColumn::new(OrderColumnKind::CustomerName),
+		OrderColumn::new(OrderColumnKind::RaffleNumber),
+	    ],
         };
 	
         (app,Task::none())
@@ -165,6 +181,21 @@ impl App {
                     column.width += offset;
                 }
             }),
+	    Message::SyncRaffleTableHeader(offset) => {
+                return Task::batch(vec![
+                    scrollable::scroll_to(self.raffle_table_header.clone(), offset),
+                ])
+            }
+            Message::RaffleTableResizing(index, offset) => {
+                if let Some(column) = self.raffle_table_columns.get_mut(index) {
+                    column.resize_offset = Some(offset);
+                }
+            }
+            Message::RaffleTableResized => self.raffle_table_columns.iter_mut().for_each(|column| {
+                if let Some(offset) = column.resize_offset.take() {
+                    column.width += offset;
+                }
+            }),
         }
 
 	Task::none()
@@ -240,6 +271,29 @@ impl App {
 		    ].spacing(20),
 		    button("Add").on_press(Message::AddOrder),
 		].padding([10, 0]).width(Length::Fixed(500.0)).spacing(10)))
+	    )
+	    .push(
+		TabId::Raffle,
+		TabLabel::Text("Raffle".to_string()),
+		column![
+		    container(
+			text("Raffle").size(30)
+		    ).padding(10),
+		    responsive(|size| {
+			table(
+			    self.raffle_table_header.clone(),
+			    self.raffle_table_body.clone(),
+			    &self.raffle_table_columns,
+			    &self.orders,
+			    Message::SyncRaffleTableHeader,
+			).on_column_resize(
+			    Message::RaffleTableResizing,
+			    Message::RaffleTableResized
+			).min_width(
+			    size.width
+			).into()
+		    })
+		],
 	    )
 	    .set_active_tab(&self.active_tab)
 	    .into()
