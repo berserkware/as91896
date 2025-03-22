@@ -1,5 +1,6 @@
 use chrono::naive::NaiveDate;
-use rusqlite::Connection;
+use rusqlite::{Connection, Error};
+use rand::prelude::*;
 
 #[derive(Default)]
 pub struct OrderBuilder {
@@ -152,7 +153,7 @@ impl OrderBuilder {
 		}
             },
 	    "return_on" => {
-		if self.hired_on_show_error {
+		if self.return_on_show_error {
 		    if let Err(e) = self.get_valid_return_on() {
 			return Some(e);
 		    }
@@ -188,6 +189,7 @@ pub struct Order {
     pub hired_on: NaiveDate,
     pub return_on: NaiveDate,
     pub boxes_needed: i32,
+    pub raffle_number: i32,
 }
 
 impl Order {
@@ -201,7 +203,8 @@ impl Order {
                 how_many       INTEGER NOT NULL,
                 hired_on       TEXT NOT NULL,
                 return_on      TEXT NOT NULL,
-                boxes_needed   INTEGER NOT NULL
+                boxes_needed   INTEGER NOT NULL,
+                raffle_number  INTEGER NOT NULL
             )",
 	    (),
 	).unwrap();
@@ -215,8 +218,11 @@ impl Order {
 	how_many: i32,
 	hired_on: NaiveDate,
 	return_on: NaiveDate,
-    ) -> Option<Order> {
+    ) -> Option<Self> {
 	let boxes_needed = (how_many + 25 - 1) / 25;
+
+	let mut rng = rand::rng();
+	let raffle_number = rng.random_range(0..=1000);
 	
 	let rows_affected = connection.execute(
 	    "INSERT INTO CustomerOrder (
@@ -226,7 +232,8 @@ impl Order {
                 how_many,       
                 hired_on,
                 return_on,  
-                boxes_needed) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                boxes_needed,
+                raffle_number) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
 	    [
 		customer_name,
 		receipt_number.to_string(),
@@ -235,20 +242,19 @@ impl Order {
 		hired_on.format("%Y-%m-%d").to_string(),
 		return_on.format("%Y-%m-%d").to_string(),
 		boxes_needed.to_string(),
+		raffle_number.to_string(),
 	    ],
 	);
 
-	if let Err(e) = rows_affected {
-	    print!("HERE {:?}", e);
-	} else if let Ok(ra) = rows_affected {
-	    print!("Added!");
-	}
+	Self::get_by_id(connection, connection.last_insert_rowid() as i32)
+    }
 
+    pub fn get_by_id(connection: &Connection, id: i32) -> Option<Self> {
 	let mut stmt = connection.prepare(
-	    "SELECT * FROM CustomerOrder WHERE id = last_insert_rowid();"
+	    "SELECT * FROM CustomerOrder WHERE id = ?1;"
 	).unwrap();
 
-	let order = stmt.query_row([], |row| {
+	let order = stmt.query_row([id], |row| {
 	    let hired_on: String = row.get(5).unwrap();
 	    let return_on: String = row.get(6).unwrap();
 	    
@@ -261,6 +267,7 @@ impl Order {
 		hired_on: NaiveDate::parse_from_str(hired_on.as_str(), "%Y-%m-%d").unwrap(),
 		return_on: NaiveDate::parse_from_str(return_on.as_str(), "%Y-%m-%d").unwrap(),
 		boxes_needed: row.get(7).unwrap(),
+		raffle_number: row.get(8).unwrap(),
 	    })
 	});
 
@@ -290,7 +297,14 @@ impl Order {
 		hired_on: NaiveDate::parse_from_str(hired_on.as_str(), "%Y-%m-%d").unwrap(),
 		return_on: NaiveDate::parse_from_str(return_on.as_str(), "%Y-%m-%d").unwrap(),
 		boxes_needed: row.get(7).unwrap(),
+		raffle_number: row.get(8).unwrap(),
 	    })
 	}).unwrap().map(|o| o.unwrap()).collect()
+    }
+
+    pub fn delete(self, connection: &Connection) -> Result<usize, Error> {
+	connection.execute(
+	    "DELETE FROM CustomerOrder WHERE id = ?1", [self.id]
+	)
     }
 }

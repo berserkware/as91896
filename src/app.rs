@@ -1,11 +1,23 @@
-use iced::{
-    widget::{button, center, column, horizontal_space, row, scrollable, text_input, Column, Text}, Color, Element, Length, Task, Theme
+use iced::widget::{
+    button,
+    center,
+    column,
+    scrollable,
+    text_input,
+    text,
+    responsive,
+    row,
+    container,
 };
+use iced::{Color, Element, Length, Task, Theme};
+
 use iced_aw::widget::{Tabs, TabLabel};
+use iced_table::table;
 use rusqlite::{Connection, Result};
 
 use crate::order::{Order, OrderBuilder};
-use crate::helpers::{table, field_error, required_input_label};
+use crate::helpers::{field_error, required_input_label};
+use crate::order_table::{OrderColumn, OrderColumnKind};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TabId {
@@ -23,14 +35,25 @@ pub enum Message {
     HiredOnChanged(String),
     ReturnOnChanged(String),
     AddOrder,
+    DeleteOrder(i32),
+
+    SyncOrderTableHeader(scrollable::AbsoluteOffset),
+    OrderTableResizing(usize, f32),
+    OrderTableResized,
     
 }
 
 pub struct App {
     db_connection: Connection,
-    orders: Vec<Order>,
+    
     active_tab: TabId,
+    
+    orders: Vec<Order>,
     order_builder: OrderBuilder,
+    
+    order_table_header: scrollable::Id,
+    order_table_body: scrollable::Id,
+    order_table_columns: Vec<OrderColumn>,
 }
 
 impl App {
@@ -40,9 +63,21 @@ impl App {
 	
 	let app = Self {
             db_connection,
-	    orders,
             active_tab: TabId::Orders,
+	    orders,
 	    order_builder: OrderBuilder::default(),
+	    order_table_header: scrollable::Id::unique(),
+	    order_table_body: scrollable::Id::unique(),
+	    order_table_columns: vec![
+		OrderColumn::new(OrderColumnKind::CustomerName),
+		OrderColumn::new(OrderColumnKind::RecieptNumber),
+		OrderColumn::new(OrderColumnKind::ItemHired),
+		OrderColumn::new(OrderColumnKind::HowMany),
+		OrderColumn::new(OrderColumnKind::HiredOn),
+		OrderColumn::new(OrderColumnKind::ReturnOn),
+		OrderColumn::new(OrderColumnKind::BoxesNeeded),
+		OrderColumn::new(OrderColumnKind::Delete),
+	    ]
         };
 	
         (app,Task::none())
@@ -61,10 +96,10 @@ impl App {
     }
 
     pub fn theme(&self) -> Theme {
-        Theme::Dark
+	Theme::Dark
     }
 
-    pub fn update(&mut self, message: Message) {
+    pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
 	    Message::TabSelected(tab) => {
 		self.active_tab = tab;
@@ -109,8 +144,30 @@ impl App {
 		    },
 		    _ => (),
 		}
-	    }
+	    },
+	    Message::DeleteOrder(id) => {
+		let order = Order::get_by_id(&self.db_connection, id).unwrap();
+		order.delete(&self.db_connection).unwrap();
+		self.orders = Order::get_all(&self.db_connection)
+	    },
+	    Message::SyncOrderTableHeader(offset) => {
+                return Task::batch(vec![
+                    scrollable::scroll_to(self.order_table_header.clone(), offset),
+                ])
+            }
+            Message::OrderTableResizing(index, offset) => {
+                if let Some(column) = self.order_table_columns.get_mut(index) {
+                    column.resize_offset = Some(offset);
+                }
+            }
+            Message::OrderTableResized => self.order_table_columns.iter_mut().for_each(|column| {
+                if let Some(offset) = column.resize_offset.take() {
+                    column.width += offset;
+                }
+            }),
         }
+
+	Task::none()
     }
 
     pub fn view(&self) -> Element<Message> {
@@ -119,36 +176,30 @@ impl App {
 		TabId::Orders,
 		TabLabel::Text("Orders".to_string()),
 		column![
-		    Text::new("Orders").size(30),
-		    scrollable(table(
-			vec![
-			    "Customer Name".to_string(),
-			    "Receipt No.".to_string(),
-			    "Item Hired".to_string(),
-			    "How Many".to_string(),
-			    "Hired On".to_string(),
-			    "Return On".to_string(),
-			    "Boxes Needed".to_string(),
-			],
-			self.orders.iter().map(
-			    |order| vec![
-				order.customer_name.clone(),
-				order.receipt_number.to_string(),
-				order.item_hired.clone(),
-				order.how_many.to_string(),
-				order.hired_on.to_string(),
-				order.return_on.to_string(),
-				order.boxes_needed.to_string(),
-			    ]
-			).collect()
-		    ))
-		].padding(10)
+		    container(
+			text("Orders").size(30)
+		    ).padding(10),
+		    responsive(|size| {
+			table(
+			    self.order_table_header.clone(),
+			    self.order_table_body.clone(),
+			    &self.order_table_columns,
+			    &self.orders,
+			    Message::SyncOrderTableHeader,
+			).on_column_resize(
+			    Message::OrderTableResizing,
+			    Message::OrderTableResized
+			).min_width(
+			    size.width
+			).into()
+		    })
+		],
 	    )
 	    .push(
 		TabId::AddOrder,
 		TabLabel::Text("Add Order".to_string()),
 		center(scrollable(column![
-		    Text::new("Add Order").size(30),
+		    text("Add Order").size(30),
 		    column![
 			required_input_label("Customer Name"),
 			text_input("", &self.order_builder.customer_name)

@@ -1,6 +1,7 @@
 mod app;
 mod order;
 mod helpers;
+mod order_table;
 
 use crate::app::App;
 use iced::{window::Settings, Result};
