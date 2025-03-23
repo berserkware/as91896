@@ -1,12 +1,13 @@
 pub mod table;
-pub mod builder;
+pub mod form;
 
 use rusqlite::{Connection, Error};
 use chrono::NaiveDate;
 use rand::prelude::*;
 
-pub use self::builder::OrderBuilder;
+pub use self::form::OrderForm;
 
+/// Represents an order in the database
 pub struct Order {
     pub id: i32,
     pub customer_name: String,
@@ -20,6 +21,7 @@ pub struct Order {
 }
 
 impl Order {
+    /// Creates the database table for Order in the given database if it doesn't exist.
     pub fn init_table(connection: &Connection) {
 	connection.execute(
 	    "CREATE TABLE IF NOT EXISTS CustomerOrder (
@@ -37,6 +39,7 @@ impl Order {
 	).unwrap();
     }
 
+    /// Creates a new Order in the database.
     pub fn new(
 	connection: &Connection,
 	customer_name: String,
@@ -76,6 +79,7 @@ impl Order {
 	Self::get_by_id(connection, connection.last_insert_rowid() as i32)
     }
 
+    /// Retrieves an order from the database by its id.
     pub fn get_by_id(connection: &Connection, id: i32) -> Option<Self> {
 	let mut stmt = connection.prepare(
 	    "SELECT * FROM CustomerOrder WHERE id = ?1;"
@@ -108,6 +112,7 @@ impl Order {
 	}
     }
 
+    /// Gets all the orders in the database.
     pub fn get_all(connection: &Connection) -> Vec<Self> {
 	let mut stmt = connection.prepare("SELECT * FROM CustomerOrder").unwrap();
 	
@@ -129,6 +134,7 @@ impl Order {
 	}).unwrap().map(|o| o.unwrap()).collect()
     }
 
+    /// Deletes an order from the database.
     pub fn delete(self, connection: &Connection) -> Result<usize, Error> {
 	connection.execute(
 	    "DELETE FROM CustomerOrder WHERE id = ?1", [self.id]

@@ -3,6 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 use crate::order::Order;
 
+/// Gets the path to the database. It creates the path to it if it doesn't exist.
 fn get_db_path() -> PathBuf {
     let mut path = dirs::data_local_dir().expect("Failed to get local data directory");
     path.push("OrderManagementToolAS91896");
@@ -11,6 +12,7 @@ fn get_db_path() -> PathBuf {
     path
 }
 
+/// Initializes the database and adds all the required tables.
 pub fn init_db() -> Connection {
     let db_path = get_db_path();
     let connection = Connection::open(db_path).expect("Failed to open SQLite database");

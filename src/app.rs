@@ -15,11 +15,12 @@ use iced_aw::widget::{Tabs, TabLabel};
 use iced_table::table;
 use rusqlite::Connection;
 
-use crate::order::{Order, OrderBuilder};
+use crate::order::{Order, OrderForm};
 use crate::order::table::{OrderColumn, OrderColumnKind};
 use crate::helpers::{field_error, required_input_label};
 use crate::database::init_db;
 
+/// Used to represent the current tab the program is on.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TabId {
     Orders,
@@ -27,6 +28,7 @@ pub enum TabId {
     Raffle,
 }
 
+/// Represents an event sent by the UI to the app
 #[derive(Clone, Debug)]
 pub enum Message {
     TabSelected(TabId),
@@ -48,13 +50,14 @@ pub enum Message {
     RaffleTableResized,
 }
 
+/// Stores the state and methods of the app
 pub struct App {
     db_connection: Connection,
     
     active_tab: TabId,
     
     orders: Vec<Order>,
-    order_builder: OrderBuilder,
+    order_form: OrderForm,
     
     order_table_header: scrollable::Id,
     order_table_body: scrollable::Id,
@@ -66,6 +69,7 @@ pub struct App {
 }
 
 impl App {
+    /// Creates the app and inits the database.
     pub fn new() -> (Self, Task<Message>) {
 	let db_connection = init_db();
 	let orders = Order::get_all(&db_connection);
@@ -74,7 +78,7 @@ impl App {
             db_connection,
             active_tab: TabId::Orders,
 	    orders,
-	    order_builder: OrderBuilder::default(),
+	    order_form: OrderForm::default(),
 	    
 	    order_table_header: scrollable::Id::unique(),
 	    order_table_body: scrollable::Id::unique(),
@@ -100,100 +104,116 @@ impl App {
         (app,Task::none())
     }
 
+    /// Gets the title of the app.
     pub fn title(&self) -> String {
-        return "as91869".into();
+        return "Order Management Application".into();
     }
 
+    /// Gets the theme of the app.
     pub fn theme(&self) -> Theme {
 	Theme::Dark
     }
 
+    /// Responds to events from the UI.
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
 	    Message::TabSelected(tab) => {
 		self.active_tab = tab;
-		self.order_builder = OrderBuilder::default();
+		self.order_form = OrderForm::default();
 	    },
 	    Message::CustomerNameChanged(customer_name) => {
-		self.order_builder.customer_name = customer_name;
-		self.order_builder.customer_name_show_error = true;
+		self.order_form.customer_name = customer_name;
+		self.order_form.customer_name_show_error = true;
 	    },
 	    Message::ReceiptNumberChanged(receipt_number) => {
-		self.order_builder.receipt_number = receipt_number;
-		self.order_builder.receipt_number_show_error = true;
+		self.order_form.receipt_number = receipt_number;
+		self.order_form.receipt_number_show_error = true;
 	    },
 	    Message::ItemHiredChanged(item_hired) => {
-		self.order_builder.item_hired = item_hired;
-		self.order_builder.item_hired_show_error = true;
+		self.order_form.item_hired = item_hired;
+		self.order_form.item_hired_show_error = true;
 	    },
 	    Message::HowManyChanged(how_many) => {
-		self.order_builder.how_many = how_many;
-		self.order_builder.how_many_show_error = true;
+		self.order_form.how_many = how_many;
+		self.order_form.how_many_show_error = true;
 	    },
 	    Message::HiredOnChanged(hired_on) => {
-		self.order_builder.hired_on = hired_on;
-		self.order_builder.hired_on_show_error = true;
+		self.order_form.hired_on = hired_on;
+		self.order_form.hired_on_show_error = true;
 	    },
 	    Message::ReturnOnChanged(return_on) => {
-		self.order_builder.return_on = return_on;
-		self.order_builder.return_on_show_error = true;
+		self.order_form.return_on = return_on;
+		self.order_form.return_on_show_error = true;
 	    },
 	    Message::AddOrder => {
-		self.order_builder.customer_name_show_error = true;
-		self.order_builder.receipt_number_show_error = true;
-		self.order_builder.item_hired_show_error = true;
-		self.order_builder.how_many_show_error = true;
-		self.order_builder.hired_on_show_error = true;
-		self.order_builder.return_on_show_error = true;
-
-		match self.order_builder.create_order(&self.db_connection) {
+		match self.order_form.create_order(&self.db_connection) {
 		    Ok(order) => {
 			self.orders.push(order);
 			self.active_tab = TabId::Orders;
 		    },
-		    _ => (),
+		    Err(_) => {
+			self.order_form.customer_name_show_error = true;
+			self.order_form.receipt_number_show_error = true;
+			self.order_form.item_hired_show_error = true;
+			self.order_form.how_many_show_error = true;
+			self.order_form.hired_on_show_error = true;
+			self.order_form.return_on_show_error = true;
+		    },
 		}
 	    },
 	    Message::DeleteOrder(id) => {
 		let order = Order::get_by_id(&self.db_connection, id).unwrap();
 		order.delete(&self.db_connection).unwrap();
+
+		// Refresh the order list to not show the deleted order
 		self.orders = Order::get_all(&self.db_connection)
 	    },
 	    Message::SyncOrderTableHeader(offset) => {
+		// Return background task to synch the order table header
                 return Task::batch(vec![
                     scrollable::scroll_to(self.order_table_header.clone(), offset),
                 ])
             }
             Message::OrderTableResizing(index, offset) => {
+		// Updates the resize offset for a specific order table column
                 if let Some(column) = self.order_table_columns.get_mut(index) {
                     column.resize_offset = Some(offset);
                 }
             }
-            Message::OrderTableResized => self.order_table_columns.iter_mut().for_each(|column| {
-                if let Some(offset) = column.resize_offset.take() {
-                    column.width += offset;
-                }
-            }),
+            Message::OrderTableResized => {
+		// Applies the stored resize offsets to update column widths in the order table
+		self.order_table_columns.iter_mut().for_each(|column| {
+                    if let Some(offset) = column.resize_offset.take() {
+			column.width += offset;
+                    }
+		})
+	    },
 	    Message::SyncRaffleTableHeader(offset) => {
+		// Returns a background task to sync the raffle table header position
                 return Task::batch(vec![
                     scrollable::scroll_to(self.raffle_table_header.clone(), offset),
                 ])
             }
             Message::RaffleTableResizing(index, offset) => {
+		// Updates the resize offset for a specific raffle table column
                 if let Some(column) = self.raffle_table_columns.get_mut(index) {
                     column.resize_offset = Some(offset);
                 }
             }
-            Message::RaffleTableResized => self.raffle_table_columns.iter_mut().for_each(|column| {
-                if let Some(offset) = column.resize_offset.take() {
-                    column.width += offset;
-                }
-            }),
+            Message::RaffleTableResized => {
+		// Applies the stored resize offsets to update column widths in the raffle table
+		self.raffle_table_columns.iter_mut().for_each(|column| {
+                    if let Some(offset) = column.resize_offset.take() {
+			column.width += offset;
+                    }
+		})
+	    },
         }
 
 	Task::none()
     }
 
+    /// Produces the UI tree of the application.
     pub fn view(&self) -> Element<Message> {
 	Tabs::new(Message::TabSelected)
 	    .push(
@@ -226,40 +246,40 @@ impl App {
 		    text("Add Order").size(30),
 		    column![
 			required_input_label("Customer Name"),
-			text_input("", &self.order_builder.customer_name)
+			text_input("", &self.order_form.customer_name)
 			    .on_input(Message::CustomerNameChanged),
-			field_error(self.order_builder.get_visible_field_error("customer_name")),
+			field_error(self.order_form.get_visible_field_error("customer_name")),
 		    ],
 		    column![
 			required_input_label("Receipt Number"),
-			text_input("", &self.order_builder.receipt_number)
+			text_input("", &self.order_form.receipt_number)
 			    .on_input(Message::ReceiptNumberChanged),
-			field_error(self.order_builder.get_visible_field_error("receipt_number")),
+			field_error(self.order_form.get_visible_field_error("receipt_number")),
 		    ],
 		    column![
 			required_input_label("Item Hired"),
-			text_input("", &self.order_builder.item_hired)
+			text_input("", &self.order_form.item_hired)
 			    .on_input(Message::ItemHiredChanged),
-			field_error(self.order_builder.get_visible_field_error("item_hired")),
+			field_error(self.order_form.get_visible_field_error("item_hired")),
 		    ],
 		    column![
 			required_input_label("How Many"),
-			text_input("", &self.order_builder.how_many)
+			text_input("", &self.order_form.how_many)
 			    .on_input(Message::HowManyChanged),
-			field_error(self.order_builder.get_visible_field_error("how_many")),
+			field_error(self.order_form.get_visible_field_error("how_many")),
 		    ],
 		    row![
 			column![
 			    required_input_label("Hired On"),
-			    text_input("YYYY-mm-dd", &self.order_builder.hired_on)
+			    text_input("YYYY-mm-dd", &self.order_form.hired_on)
 				.on_input(Message::HiredOnChanged),
-			    field_error(self.order_builder.get_visible_field_error("hired_on")),
+			    field_error(self.order_form.get_visible_field_error("hired_on")),
 			],
 			column![
 			    required_input_label("Return On"),
-			    text_input("YYYY-mm-dd", &self.order_builder.return_on)
+			    text_input("YYYY-mm-dd", &self.order_form.return_on)
 				.on_input(Message::ReturnOnChanged),
-			    field_error(self.order_builder.get_visible_field_error("return_on")),
+			    field_error(self.order_form.get_visible_field_error("return_on")),
 			],
 		    ].spacing(20),
 		    button("Add").on_press(Message::AddOrder),

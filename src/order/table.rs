@@ -4,6 +4,7 @@ use iced_table::table;
 use crate::app::Message;
 use crate::order::Order;
 
+/// Represents a column for the orders and raffle table.
 pub struct OrderColumn {
     pub kind: OrderColumnKind,
     pub width: f32,
@@ -32,6 +33,7 @@ impl OrderColumn {
     }
 }
 
+/// Represents what the field the column corrosponds to.
 pub enum OrderColumnKind {
     CustomerName,
     RecieptNumber,

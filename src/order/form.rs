@@ -2,8 +2,9 @@ use crate::order::Order;
 use rusqlite::Connection;
 use chrono::NaiveDate;
 
+/// Represents a form to create an Order
 #[derive(Default)]
-pub struct OrderBuilder {
+pub struct OrderForm {
     pub customer_name: String,
     pub customer_name_show_error: bool,
     pub receipt_number: String,
@@ -18,7 +19,8 @@ pub struct OrderBuilder {
     pub return_on_show_error: bool,
 }
 
-impl OrderBuilder {
+impl OrderForm {
+    /// Gets customer_name, or Err if it is invalid.
     fn get_valid_customer_name(&self) -> Result<String, String> {
 	if self.customer_name.is_empty() {
             return Err("Customer name is required".to_string());
@@ -33,6 +35,7 @@ impl OrderBuilder {
 	Ok(self.customer_name.clone())
     }
 
+    /// Gets reciept_number as an integer, or Err if it is invalid.
     fn get_valid_receipt_number(&self) -> Result<i64, String> {
 	if self.receipt_number.is_empty() {
             return Err("Receipt number is required".to_string());
@@ -48,6 +51,7 @@ impl OrderBuilder {
 	}
     }
 
+    /// Gets item_hired, or Err if it is invalid.
     fn get_valid_item_hired(&self) -> Result<String, String> {
 	if self.item_hired.is_empty() {
             return Err("Item hired is required".to_string());
@@ -62,6 +66,7 @@ impl OrderBuilder {
 	Ok(self.item_hired.clone())
     }
 
+    /// Gets how_many as an integer, or Err if it is invalid.
     fn get_valid_how_many(&self) -> Result<i32, String> {
 	if self.how_many.is_empty() {
             return Err("How many is required".to_string());
@@ -82,7 +87,8 @@ impl OrderBuilder {
             }
 	}
     }
-    
+
+    /// Gets hired_on as a NaiveDate, or Err if it is invalid.
     fn get_valid_hired_on(&self) -> Result<NaiveDate, String> {
 	if self.hired_on.is_empty() {
             return Err("Hired on date is required".to_string());
@@ -98,7 +104,8 @@ impl OrderBuilder {
 	    }
 	}
     }
-    
+
+    /// Gets return_on as a NaiveDate, or Err if it is invalid.
     fn get_valid_return_on(&self) -> Result<NaiveDate, String> {
 	if self.return_on.is_empty() {
             return Err("Return on date is required".to_string());
@@ -114,7 +121,8 @@ impl OrderBuilder {
 	    }
 	}
     }
-    
+
+    /// Gets the error for a given field if its corresponding *_show_error is set to true.
     pub fn get_visible_field_error(&self, field: &str) -> Option<String> {
 	match field {
             "customer_name" => {
@@ -165,6 +173,7 @@ impl OrderBuilder {
 	None
     }
 
+    /// Creates an Order if all fields of the form are valid.
     pub fn create_order(&self, connection: &Connection) -> Result<Order, String> {
 	Ok(
 	    Order::new(
