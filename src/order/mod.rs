@@ -8,6 +8,7 @@ use rand::prelude::*;
 pub use self::form::OrderForm;
 
 /// Represents an order in the database
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Order {
     pub id: i32,
     pub customer_name: String,
@@ -22,7 +23,7 @@ pub struct Order {
 
 impl Order {
     /// Creates the database table for Order in the given database if it doesn't exist.
-    pub fn init_table(connection: &Connection) {
+    pub fn init_table(connection: &Connection) -> Result<usize, Error> {
 	connection.execute(
 	    "CREATE TABLE IF NOT EXISTS CustomerOrder (
                 id             INTEGER PRIMARY KEY,
@@ -36,7 +37,7 @@ impl Order {
                 raffle_number  INTEGER NOT NULL
             )",
 	    (),
-	).unwrap();
+	)
     }
 
     /// Creates a new Order in the database.
@@ -48,8 +49,8 @@ impl Order {
 	how_many: i32,
 	hired_on: NaiveDate,
 	return_on: NaiveDate,
-    ) -> Option<Self> {
-	let boxes_needed = (how_many + 25 - 1) / 25;
+    ) -> Result<Self, Error> {
+	let boxes_needed = boxes_needed(how_many);
 
 	let mut rng = rand::rng();
 	let raffle_number = rng.random_range(0..=1000);
@@ -74,18 +75,18 @@ impl Order {
 		boxes_needed.to_string(),
 		raffle_number.to_string(),
 	    ],
-	).unwrap();
+	)?;
 
 	Self::get_by_id(connection, connection.last_insert_rowid() as i32)
     }
 
     /// Retrieves an order from the database by its id.
-    pub fn get_by_id(connection: &Connection, id: i32) -> Option<Self> {
+    pub fn get_by_id(connection: &Connection, id: i32) -> Result<Self, Error> {
 	let mut stmt = connection.prepare(
 	    "SELECT * FROM CustomerOrder WHERE id = ?1;"
-	).unwrap();
+	)?;
 
-	let order = stmt.query_row([id], |row| {
+	stmt.query_row([id], |row| {
 	    let hired_on: String = row.get(5).unwrap();
 	    let return_on: String = row.get(6).unwrap();
 	    
@@ -100,16 +101,7 @@ impl Order {
 		boxes_needed: row.get(7).unwrap(),
 		raffle_number: row.get(8).unwrap(),
 	    })
-	});
-
-	match order {
-	    Err(_) => {
-		None
-	    },
-	    Ok(o) => {
-		Some(o)
-	    }
-	}
+	})
     }
 
     /// Gets all the orders in the database.
@@ -142,3 +134,122 @@ impl Order {
     }
 }
 
+/// Gets how many boxes needed to store the given amount of items
+fn boxes_needed(items: i32) -> i32 {
+    (items + 25 - 1) / 25
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::database::init_db_tables;
+
+    use super::*;
+
+    #[test]
+    fn test_init_order_table() {
+	let con = Connection::open_in_memory().unwrap();
+
+	assert!(Order::init_table(&con).is_ok());
+    }
+
+    #[test]
+    fn test_new_order() {
+	let con = Connection::open_in_memory().unwrap();
+
+	init_db_tables(&con);
+
+	assert!(Order::new(
+	    &con,
+	    "Test Person".to_string(),
+	    15,
+	    "Test Item".to_string(),
+	    26,
+	    NaiveDate::from_ymd_opt(2025, 3, 23).unwrap(),
+	    NaiveDate::from_ymd_opt(2025, 3, 23).unwrap(),
+	).is_ok());
+    }
+
+    #[test]
+    fn test_boxes_needed() {
+	assert_eq!(boxes_needed(26), 2);
+    }
+
+    #[test]
+    fn test_boxes_needed_zero() {
+	assert_eq!(boxes_needed(0), 0);
+    }
+
+    #[test]
+    fn test_boxes_needed_exact() {
+	assert_eq!(boxes_needed(30), 2);
+    }
+
+    #[test]
+    fn test_get_order_by_id() {
+	let con = Connection::open_in_memory().unwrap();
+
+	init_db_tables(&con);
+
+	let order = Order::new(
+	    &con,
+	    "Test Person".to_string(),
+	    15,
+	    "Test Item".to_string(),
+	    26,
+	    NaiveDate::from_ymd_opt(2025, 3, 23).unwrap(),
+	    NaiveDate::from_ymd_opt(2025, 3, 23).unwrap(),
+	).unwrap();
+
+	assert!(Order::get_by_id(&con, order.id).is_ok());
+    }
+
+    #[test]
+    fn test_get_order_by_id_doesnt_exist() {
+	let con = Connection::open_in_memory().unwrap();
+
+	init_db_tables(&con);
+	
+	assert!(Order::get_by_id(&con, 1132).is_err());
+    }
+
+    #[test]
+    fn test_order_get_all() {
+	let con = Connection::open_in_memory().unwrap();
+
+	init_db_tables(&con);
+
+	let order = Order::new(
+	    &con,
+	    "Test Person".to_string(),
+	    15,
+	    "Test Item".to_string(),
+	    26,
+	    NaiveDate::from_ymd_opt(2025, 3, 23).unwrap(),
+	    NaiveDate::from_ymd_opt(2025, 3, 23).unwrap(),
+	).unwrap();
+
+	let orders = Order::get_all(&con);
+	
+	assert!(!orders.is_empty());
+	assert_eq!(orders[0], order);
+    }
+
+    #[test]
+    fn test_order_delete() {
+	let con = Connection::open_in_memory().unwrap();
+
+	init_db_tables(&con);
+
+	let order = Order::new(
+	    &con,
+	    "Test Person".to_string(),
+	    15,
+	    "Test Item".to_string(),
+	    26,
+	    NaiveDate::from_ymd_opt(2025, 3, 23).unwrap(),
+	    NaiveDate::from_ymd_opt(2025, 3, 23).unwrap(),
+	).unwrap();
+
+	assert!(order.delete(&con).is_ok());
+    }
+}

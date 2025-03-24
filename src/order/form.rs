@@ -188,3 +188,214 @@ impl OrderForm {
 	)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::database::init_db_tables;
+
+    use super::*;
+
+    #[test]
+    fn test_get_valid_customer_name() {
+	let mut form = OrderForm::default();
+	form.customer_name = "Testing".to_string();
+	
+	assert!(form.get_valid_customer_name().is_ok());
+    }
+    
+    #[test]
+    fn test_get_valid_customer_name_empty() {
+	let form = OrderForm::default();
+
+	assert!(form.get_valid_customer_name().is_err());
+    }
+
+    #[test]
+    fn test_get_valid_customer_name_too_short() {
+	let mut form = OrderForm::default();
+	form.customer_name = "aa".to_string();
+	
+	assert!(form.get_valid_customer_name().is_err());
+    }
+
+    #[test]
+    fn test_get_valid_customer_name_too_long() {
+	let mut form = OrderForm::default();
+	form.customer_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string();
+
+	assert!(form.get_valid_customer_name().is_err());
+    }
+
+    #[test]
+    fn test_get_valid_receipt_number() {
+	let mut form = OrderForm::default();
+	form.receipt_number = "123".to_string();
+
+	assert!(form.get_valid_receipt_number().is_ok());
+    }
+
+    #[test]
+    fn test_get_valid_receipt_number_empty() {
+	let form = OrderForm::default();
+
+	assert!(form.get_valid_receipt_number().is_err());
+    }
+
+    #[test]
+    fn test_get_valid_receipt_number_not_a_number() {
+	let mut form = OrderForm::default();
+	form.receipt_number = "hello".to_string();
+
+	assert!(form.get_valid_receipt_number().is_err());
+    }
+
+    #[test]
+    fn test_get_valid_item_hired() {
+	let mut form = OrderForm::default();
+	form.item_hired = "Test Item".to_string();
+
+	assert!(form.get_valid_item_hired().is_ok())
+    }
+
+    #[test]
+    fn test_get_valid_item_hired_empty() {
+	let form = OrderForm::default();
+
+	assert!(form.get_valid_item_hired().is_err())
+    }
+
+    #[test]
+    fn test_get_valid_item_hired_too_short() {
+	let mut form = OrderForm::default();
+	form.item_hired = "aa".to_string();
+
+	assert!(form.get_valid_item_hired().is_err())
+    }
+
+    #[test]
+    fn test_get_valid_item_hired_too_long() {
+	let mut form = OrderForm::default();
+	form.item_hired = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string();
+
+	assert!(form.get_valid_item_hired().is_err())
+    }
+
+    #[test]
+    fn test_get_valid_how_many() {
+	let mut form = OrderForm::default();
+	form.how_many = "250".to_string();
+
+	assert!(form.get_valid_how_many().is_ok());
+    }
+
+    #[test]
+    fn test_get_valid_how_many_empty() {
+	let form = OrderForm::default();
+
+	assert!(form.get_valid_how_many().is_err());
+    }
+
+    #[test]
+    fn test_get_valid_how_many_not_an_int() {
+	let mut form = OrderForm::default();
+	form.how_many = "asdf".to_string();
+
+	assert!(form.get_valid_how_many().is_err());
+    }
+
+    #[test]
+    fn test_get_valid_how_many_too_small() {
+	let mut form = OrderForm::default();
+	form.how_many = "-24".to_string();
+
+	assert!(form.get_valid_how_many().is_err());
+    }
+
+    #[test]
+    fn test_get_valid_how_many_too_big() {
+	let mut form = OrderForm::default();
+	form.how_many = "21442".to_string();
+
+	assert!(form.get_valid_how_many().is_err());
+    }
+
+    #[test]
+    fn test_get_valid_hired_on() {
+	let mut form = OrderForm::default();
+	form.hired_on = "2024-03-24".to_string();
+
+	assert!(form.get_valid_hired_on().is_ok());
+    }
+
+    #[test]
+    fn test_get_valid_hired_on_empty() {
+	let form = OrderForm::default();
+
+	assert!(form.get_valid_hired_on().is_err());
+    }
+
+    #[test]
+    fn test_get_valid_hired_on_invalid_format() {
+	let mut form = OrderForm::default();
+	form.hired_on = "2024/03-asdf".to_string();
+
+	assert!(form.get_valid_hired_on().is_err());
+    }
+
+    #[test]
+    fn test_get_valid_return_on() {
+	let mut form = OrderForm::default();
+	form.return_on = "2024-03-24".to_string();
+
+	assert!(form.get_valid_return_on().is_ok());
+    }
+
+    #[test]
+    fn test_get_valid_return_on_empty() {
+	let form = OrderForm::default();
+
+	assert!(form.get_valid_return_on().is_err());
+    }
+
+    #[test]
+    fn test_get_valid_return_on_invalid_format() {
+	let mut form = OrderForm::default();
+	form.return_on = "2024/03-asdf".to_string();
+
+	assert!(form.get_valid_return_on().is_err());
+    }
+
+    #[test]
+    fn test_form_create_order() {
+	let mut form = OrderForm::default();
+	form.customer_name = "Test".to_string();
+	form.receipt_number = "123".to_string();
+	form.item_hired = "Test Item".to_string();
+	form.how_many = "123".to_string();
+	form.hired_on = "1-1-1".to_string();
+	form.return_on = "1-1-2".to_string();
+
+	let con = Connection::open_in_memory().unwrap();
+
+	init_db_tables(&con);
+
+	assert!(form.create_order(&con).is_ok());
+    }
+
+    #[test]
+    fn test_form_create_order_invalid() {
+	let mut form = OrderForm::default();
+	form.customer_name = "Test".to_string();
+	form.receipt_number = "12asdf3".to_string();
+	form.item_hired = "Test Item".to_string();
+	form.how_many = "123asdf".to_string();
+	form.hired_on = "1-1-1".to_string();
+	form.return_on = "1-1-2".to_string();
+
+	let con = Connection::open_in_memory().unwrap();
+
+	init_db_tables(&con);
+
+	assert!(form.create_order(&con).is_err());
+    }
+}

@@ -18,7 +18,6 @@ use rusqlite::Connection;
 use crate::order::{Order, OrderForm};
 use crate::order::table::{OrderColumn, OrderColumnKind};
 use crate::helpers::{field_error, required_input_label};
-use crate::database::init_db;
 
 /// Used to represent the current tab the program is on.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -52,17 +51,24 @@ pub enum Message {
 
 /// Stores the state and methods of the app
 pub struct App {
+    // The database connection
     db_connection: Connection,
-    
+
+    // What tab is active
     active_tab: TabId,
-    
+
+    // The orders in the table
     orders: Vec<Order>,
+
+    // The form for the add order screen
     order_form: OrderForm,
-    
+
+    // Infomation for the order table
     order_table_header: scrollable::Id,
     order_table_body: scrollable::Id,
     order_table_columns: Vec<OrderColumn>,
 
+    // Infomation for the raffle table
     raffle_table_header: scrollable::Id,
     raffle_table_body: scrollable::Id,
     raffle_table_columns: Vec<OrderColumn>,
@@ -70,8 +76,7 @@ pub struct App {
 
 impl App {
     /// Creates the app and inits the database.
-    pub fn new() -> (Self, Task<Message>) {
-	let db_connection = init_db();
+    pub fn new(db_connection: Connection) -> (Self, Task<Message>) {
 	let orders = Order::get_all(&db_connection);
 	
 	let app = Self {
@@ -79,7 +84,7 @@ impl App {
             active_tab: TabId::Orders,
 	    orders,
 	    order_form: OrderForm::default(),
-	    
+
 	    order_table_header: scrollable::Id::unique(),
 	    order_table_body: scrollable::Id::unique(),
 	    order_table_columns: vec![
@@ -310,5 +315,119 @@ impl App {
 	    )
 	    .set_active_tab(&self.active_tab)
 	    .into()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::database::init_db_tables;
+
+    use super::*;
+
+    #[test]
+    fn test_app_tab_selected_message() {
+	let connection = Connection::open_in_memory().unwrap();
+
+	init_db_tables(&connection);
+	
+	let mut app = App::new(connection).0;
+
+	let _ = app.update(Message::TabSelected(TabId::AddOrder));
+	assert_eq!(app.active_tab, TabId::AddOrder);
+    }
+
+    #[test]
+    fn test_app_customer_name_changed() {
+	let connection = Connection::open_in_memory().unwrap();
+
+	init_db_tables(&connection);
+	
+	let mut app = App::new(connection).0;
+
+	let _ = app.update(Message::CustomerNameChanged("Test".to_string()));
+	assert_eq!(app.order_form.customer_name, "Test".to_string());
+	assert_eq!(app.order_form.customer_name_show_error, true);
+    }
+
+    #[test]
+    fn test_app_receipt_number_changed() {
+	let connection = Connection::open_in_memory().unwrap();
+
+	init_db_tables(&connection);
+	
+	let mut app = App::new(connection).0;
+
+	let _ = app.update(Message::ReceiptNumberChanged("Test".to_string()));
+	assert_eq!(app.order_form.receipt_number, "Test".to_string());
+	assert_eq!(app.order_form.receipt_number_show_error, true);
+    }
+
+    #[test]
+    fn test_app_item_hired_changed() {
+	let connection = Connection::open_in_memory().unwrap();
+
+	init_db_tables(&connection);
+	
+	let mut app = App::new(connection).0;
+
+	let _ = app.update(Message::ItemHiredChanged("Test".to_string()));
+	assert_eq!(app.order_form.item_hired, "Test".to_string());
+	assert_eq!(app.order_form.item_hired_show_error, true);
+    }
+
+    #[test]
+    fn test_app_how_many_changed() {
+	let connection = Connection::open_in_memory().unwrap();
+
+	init_db_tables(&connection);
+	
+	let mut app = App::new(connection).0;
+
+	let _ = app.update(Message::HowManyChanged("Test".to_string()));
+	assert_eq!(app.order_form.how_many, "Test".to_string());
+	assert_eq!(app.order_form.how_many_show_error, true);
+    }
+
+    #[test]
+    fn test_app_hired_on_changed() {
+	let connection = Connection::open_in_memory().unwrap();
+
+	init_db_tables(&connection);
+	
+	let mut app = App::new(connection).0;
+
+	let _ = app.update(Message::HiredOnChanged("Test".to_string()));
+	assert_eq!(app.order_form.hired_on, "Test".to_string());
+	assert_eq!(app.order_form.hired_on_show_error, true);
+    }
+
+    #[test]
+    fn test_app_return_on_changed() {
+	let connection = Connection::open_in_memory().unwrap();
+
+	init_db_tables(&connection);
+	
+	let mut app = App::new(connection).0;
+
+	let _ = app.update(Message::ReturnOnChanged("Test".to_string()));
+	assert_eq!(app.order_form.return_on, "Test".to_string());
+	assert_eq!(app.order_form.return_on_show_error, true);
+    }
+
+    #[test]
+    fn test_app_add_order() {
+	let connection = Connection::open_in_memory().unwrap();
+
+	init_db_tables(&connection);
+	
+	let mut app = App::new(connection).0;
+
+	let _ = app.update(Message::AddOrder);
+	assert_eq!(app.order_form.customer_name_show_error, true);
+	assert_eq!(app.order_form.receipt_number_show_error, true);
+	assert_eq!(app.order_form.item_hired_show_error, true);
+	assert_eq!(app.order_form.how_many_show_error, true);
+	assert_eq!(app.order_form.hired_on_show_error, true);
+	assert_eq!(app.order_form.return_on_show_error, true);
     }
 }

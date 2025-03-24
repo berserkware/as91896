@@ -4,6 +4,7 @@ mod helpers;
 mod database;
 
 use crate::app::App;
+use crate::database::init_db;
 use iced::{window::Settings, Result};
 
 fn main() -> Result {
@@ -14,5 +15,5 @@ fn main() -> Result {
             ..Default::default()
         })
         .theme(App::theme)
-        .run_with(App::new)
+        .run_with(|| App::new(init_db()))
 }
