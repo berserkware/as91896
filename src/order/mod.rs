@@ -173,7 +173,7 @@ mod tests {
     fn test_boxes_needed() {
 	assert_eq!(boxes_needed(26), 2);
     }
-
+    
     #[test]
     fn test_boxes_needed_zero() {
 	assert_eq!(boxes_needed(0), 0);
@@ -182,6 +182,11 @@ mod tests {
     #[test]
     fn test_boxes_needed_exact() {
 	assert_eq!(boxes_needed(30), 2);
+    }
+
+    #[test]
+    fn test_boxes_needed_negative() {
+	assert_eq!(boxes_needed(-26), 0);
     }
 
     #[test]
