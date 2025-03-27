@@ -18,3 +18,10 @@ if you changed directory, a new database was created. I fixed this by
 storing the database in a user-specific OS-specific data directory.
 After this you would use the same database no matter where you ran the 
 program from.
+
+## Get By Id Panic Bug
+I found when writing tests that Order's get_by_id method would panic
+the program. I found that the bug was that instead of returning an
+error when running the SQL command, it would just unwrap it, panicing
+the program. I fixed it by replacing .unwrap() with ? to forward the 
+error to the caller for their handling.
